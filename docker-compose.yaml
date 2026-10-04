@@ -1,0 +1,119 @@
+services:
+  minio:
+    container_name: Minio
+    command: server /data --console-address ":9001"
+    environment:
+    - MINIO_ROOT_USER=admin
+    - MINIO_ROOT_PASSWORD=supersecret
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-04-22T22-12-26Z
+    ports:
+    - 9000:9000
+    - 9001:9001
+    volumes:
+    - minio_data:/data
+    restart: unless-stopped
+  postgres_MLFlow:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: bdmlflow
+      POSTGRES_PASSWORD: bdmlflow
+      POSTGRES_DB: bdmlflow
+    volumes:
+    - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD
+      - pg_isready
+      - -U
+      - bdmlflow
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+  mlflow:
+    build:
+      context: mlflow
+      dockerfile: Dockerfile
+    container_name: MLflow
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: supersecret
+    depends_on:
+      minio:
+        condition: service_started
+      postgres_MLFlow:
+        condition: service_healthy
+    ports:
+    - 5001:5000
+    restart: always
+    image: mlflow-taller:2.22.0
+  jupyter:
+    image: jupyter/scipy-notebook:latest
+    container_name: Jupyter
+    ports:
+    - 8888:8888
+    volumes:
+    - ./notebooks:/home/jovyan/work
+    environment:
+    - JUPYTER_ENABLE_LAB=yes
+    - JUPYTER_TOKEN=valentasecret
+    - MLFLOW_TRACKING_URI=http://mlflow:5000
+    - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+    - AWS_ACCESS_KEY_ID=admin
+    - AWS_SECRET_ACCESS_KEY=supersecret
+    - DATA_PASSWORD=datos_taller
+    depends_on:
+      mlflow:
+        condition: service_started
+      data-db:
+        condition: service_healthy
+    restart: always
+  data-db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: experiment_data
+      POSTGRES_USER: data_user
+      POSTGRES_PASSWORD: datos_taller
+    volumes:
+    - datos-taller:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD
+      - pg_isready
+      - -U
+      - data_user
+      - -d
+      - experiment_data
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  api:
+    image: mlflow-taller:2.22.0
+    build:
+      context: ./mlflow
+    command:
+    - uvicorn
+    - api:app
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8000'
+    working_dir: /api
+    volumes:
+    - ./api:/api:ro
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_NAME: wine_classifier
+      MODEL_ALIAS: champion
+    ports:
+    - 8027:8000
+    depends_on:
+    - mlflow
+    restart: unless-stopped
+volumes:
+  minio_data:
+    driver: local
+  postgres-db-volume: null
+  datos-taller: null

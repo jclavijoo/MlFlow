@@ -1,0 +1,14 @@
+artifact_uri: file:///home/estudiante/MLOPS_PUJ/Niveles/2/mlflow_compose/notebooks/mlruns/0/d7fc0909777343479dc76ffcaa28d973/artifacts
+end_time: 1790727485065
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: d7fc0909777343479dc76ffcaa28d973
+run_name: no_artifacts_logged
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1790727484832
+status: 3
+tags: []
+user_id: estudiante
